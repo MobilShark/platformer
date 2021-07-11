@@ -1,5 +1,7 @@
 import pygame
 from pygame.locals import *
+import pickle
+from os import path
 
 pygame.init()
 
@@ -12,14 +14,18 @@ screen_height = 1000
 screen = pygame.display.set_mode((screen_width, screen_height))
 pygame.display.set_caption('Платформер')
 
-# Константы
+
 tile_size = 50
 game_over = 0
+main_menu = True
+level = 1
 
 # Графика
 sun_img = pygame.image.load('img/sun.png')
 bg_img = pygame.image.load('img/sky.png')
 restart_img = pygame.image.load('img/restart_btn.png')
+start_img = pygame.image.load('img/start_btn.png')
+exit_img = pygame.image.load('img/exit_btn.png')
 
 
 class Button:
@@ -29,7 +35,6 @@ class Button:
         self.rect.x = x
         self.rect.y = y
         self.clicked = False
-
 
     def draw(self):
         action = False
@@ -47,6 +52,7 @@ class Button:
         screen.blit(self.image, self.rect)
 
         return action
+
 
 class Player:
     def __init__(self, x, y):
@@ -191,6 +197,9 @@ class World:
                 if tile == 6:
                     lava = Lava(col_count * tile_size, row_count * tile_size + (tile_size // 2))
                     lava_group.add(lava)
+                if tile == 8:
+                    exit = Exit(col_count * tile_size, row_count * tile_size)
+                    exit_group.add(exit)
                 col_count += 1
             row_count += 1
 
@@ -228,37 +237,32 @@ class Lava(pygame.sprite.Sprite):
         self.rect.y = y
 
 
-world_data = [
-    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 1],
-    [1, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 2, 2, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 7, 0, 5, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 1],
-    [1, 7, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 7, 0, 0, 0, 0, 1],
-    [1, 0, 2, 0, 0, 7, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 2, 0, 0, 4, 0, 0, 0, 0, 3, 0, 0, 3, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 7, 0, 0, 0, 0, 2, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 2, 2, 2, 2, 2, 1],
-    [1, 0, 0, 0, 0, 0, 2, 2, 2, 6, 6, 6, 6, 6, 1, 1, 1, 1, 1, 1],
-    [1, 0, 0, 0, 0, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    [1, 0, 0, 0, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    [1, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-]
+class Exit(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        pygame.sprite.Sprite.__init__(self)
+        img = pygame.image.load('img/exit.png.png')
+        self.image = pygame.transform.scale(img, (tile_size, tile_size * 1.5))
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+
+
 
 player = Player(100, screen_height - 130)
 
 blob_group = pygame.sprite.Group()
 lava_group = pygame.sprite.Group()
+exit_group = pygame.sprite.Group()
+
+if path.exists(f'level{level}_data'):
+    pickle_in = open(f'level{level}_data', 'rb')
+    world_data = pickle.load(pickle_in)
 world = World(world_data)
 
 # Кнопки
 restart_button = Button(screen_width // 2 - 50, screen_height // 2 + 100, restart_img)
+start_button = Button(screen_width // 2 - 350, screen_height // 2, start_img)
+exit_button = Button(screen_width // 2 + 150, screen_height // 2, exit_img)
 
 run = True
 while run:
@@ -267,20 +271,26 @@ while run:
     screen.blit(bg_img, (0, 0))
     screen.blit(sun_img, (100, 100))
 
-    world.draw()
+    if main_menu:
+        if exit_button.draw():
+            run = False
+        if start_button.draw():
+            main_menu = False
+    else:
+        world.draw()
 
-    if game_over == 0:
-        blob_group.update()
+        if game_over == 0:
+            blob_group.update()
 
-    blob_group.draw(screen)
-    lava_group.draw(screen)
+        blob_group.draw(screen)
+        lava_group.draw(screen)
 
-    game_over = player.update(game_over)
+        game_over = player.update(game_over)
 
-    if game_over == -1:
-        if restart_button.draw():
-            player.reset(100, screen_height - 130)
-            game_over = 0
+        if game_over == -1:
+            if restart_button.draw():
+                player.reset(100, screen_height - 130)
+                game_over = 0
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
