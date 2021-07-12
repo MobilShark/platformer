@@ -56,6 +56,7 @@ def draw_text(text, font, text_col, x, y):
 def reset_level(level):
     player.reset(100, screen_height - 130)
     blob_group.empty()
+    platform_group.empty()
     lava_group.empty()
     exit_group.empty()
     if path.exists(f'level{level}_data'):
@@ -99,6 +100,7 @@ class Player:
         dx = 0
         dy = 0
         walk_cooldown = 3
+        col_thresh = 20
 
         if game_over == 0:
             # Клавиши управления
@@ -171,6 +173,20 @@ class Player:
             if pygame.sprite.spritecollide(self, exit_group, False):
                 game_over = 1
 
+            for platform in platform_group:
+                if platform.rect.colliderect(self.rect.x + dx, self.rect.y, self.width, self.height):
+                    dx = 0
+                if platform.rect.colliderect(self.rect.x, self.rect.y + dy, self.width, self.height):
+                    if abs((self.rect.top + dy) - platform.rect.bottom) < col_thresh:
+                        self.vel_y = 0
+                        dy = platform.rect.bottom - self.rect.top
+                    elif abs((self.rect.bottom + dy) - platform.rect.top) < col_thresh:
+                        self.rect.bottom = platform.rect.top - 1
+                        self.in_air = False
+                        dy = 0
+                    if platform.move_x != 0:
+                        self.rect.x += platform.move_direction
+
             # Проверка координат игрока
             self.rect.x += dx
             self.rect.y += dy
@@ -181,7 +197,6 @@ class Player:
                 self.rect.y -= 5
         # Отрисовка персонажа на экране
         screen.blit(self.image, self.rect)
-        pygame.draw.rect(screen, (255, 255, 255), self.rect, 2)
 
         return game_over
 
@@ -239,7 +254,11 @@ class World:
                     blob = Enemy(col_count * tile_size, row_count * tile_size + 15)
                     blob_group.add(blob)
                 if tile == 4:
-                    platform = Platform
+                    platform = Platform(col_count * tile_size, row_count * tile_size, 1, 0)
+                    platform_group.add(platform)
+                if tile == 5:
+                    platform = Platform(col_count * tile_size, row_count * tile_size, 0, 1)
+                    platform_group.add(platform)
                 if tile == 6:
                     lava = Lava(col_count * tile_size, row_count * tile_size + (tile_size // 2))
                     lava_group.add(lava)
@@ -255,7 +274,6 @@ class World:
     def draw(self):
         for tile in self.tile_list:
             screen.blit(tile[0], tile[1])
-            pygame.draw.rect(screen, (255, 255, 255), tile[1], 2)
 
 
 class Enemy(pygame.sprite.Sprite):
@@ -277,13 +295,26 @@ class Enemy(pygame.sprite.Sprite):
 
 
 class Platform(pygame.sprite.Sprite):
-    def __init__(self, x, y):
+    def __init__(self, x, y, move_x, move_y):
         pygame.sprite.Sprite.__init__(self)
         img = pygame.image.load('img/platform.png')
         self.image = pygame.transform.scale(img, (tile_size, tile_size // 2))
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
+        self.move_counter = 0
+        self.move_direction = 1
+        self.move_x = move_x
+        self.move_y = move_y
+
+    def update(self):
+        self.rect.x += self.move_direction * self.move_x
+        self.rect.y += self.move_direction * self.move_y
+        self.move_counter += 1
+        if abs(self.move_counter) > 50:
+            self.move_direction *= -1
+            self.move_counter *= -1
+
 
 
 class Lava(pygame.sprite.Sprite):
@@ -354,6 +385,7 @@ while run:
 
         if game_over == 0:
             blob_group.update()
+            platform_group.update()
             if pygame.sprite.spritecollide(player, coin_group, True):
                 score += 1
                 coin_fx.play()
